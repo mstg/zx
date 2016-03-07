@@ -89,22 +89,29 @@ int xcb_h_draw_text(xcb_helper_struct *internal, int gcnum, int x, int y, const 
 
 void xcb_h_destroy(int exit_status, void *internal);
 
-#define XCBPOLL(internal, var) \
-  while(var) { \
-    if ((internal->event = xcb_poll_for_event(internal->c))) { \
-      internal->expose_ev = (xcb_expose_event_t*)internal->event; \
-      switch (internal->event->response_type & 0x7F) {
+#define FL(internal) \
+  xcb_flush(internal->c);
 
-#define XCBEX(internal, ints, func) \
-  case XCB_EXPOSE: \
-    if (internal->expose_ev->count == 0) { \
-      func(internal, ints); \
-    }
+
+#define XCBPOLL(var) \
+  while(var) {
+
+#define XCBEX(internal, ints, func, clear_func, redraw) \
+  if (redraw) { \
+    clear_func(internal, ints); \
+    func(internal, ints); \
+    FL(internal) \
+  } \
+  if ((internal->event = xcb_poll_for_event(internal->c))) { \
+    internal->expose_ev = (xcb_expose_event_t*)internal->event; \
+    switch (internal->event->response_type & 0x7F) { \
+      case XCB_EXPOSE: \
+        if (internal->expose_ev->count == 0) { \
+          func(internal, ints); \
+        } \
+        FL(internal);
 
 #define XCBPE() \
       } \
     } \
   }
-
-#define FL(internal) \
-  xcb_flush(internal->c);

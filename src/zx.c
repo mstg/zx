@@ -26,10 +26,34 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <unistd.h>
 
 #include "zx.h"
 #include "xcb_helper.h"
 #include <i3ipc-glib/i3ipc-glib.h>
+
+static int events = 1;
+static int redraw = 0;
+static int times = 0;
+
+void zx_log_init(zx *internal) {
+  const char *homedir;
+  if ((homedir = getenv("HOME")) == NULL) {
+      homedir = getpwuid(getuid())->pw_dir;
+  }
+
+  char logfile[128];
+  sprintf(logfile, "%s/.zx.log", homedir);
+
+  internal->log_file = fopen(logfile, "a+");
+}
+
+void zx_log(zx *internal, const char *log_) {
+  if (internal->log_file) fprintf(internal->log_file, log_);
+  printf(log_);
+}
 
 void zx_config(xcb_helper_struct *_s) {
     // TODO: Actually parse config here
@@ -84,6 +108,10 @@ void add_win(zx *_s, xcb_helper_struct *zs, const char *label) {
   memcpy(_s->windef[_s->windows-1]->win_rect, win_rect, sizeof(win_rect));
 }
 
+void clear_window(xcb_helper_struct *_s, zx *zs) {
+  xcb_h_draw_fill_rect(_s, GC0, 1, (xcb_rectangle_t[]){ 0, 0, _s->width, _s->height });
+}
+
 void scan_width(zx *_s, xcb_helper_struct *zs) {
   for (int i = 0; i < _s->windows; i++) {
     int width = width_for_rect(_s, zs);
@@ -125,39 +153,87 @@ void clear_windows_main(zx *internal, xcb_helper_struct *ints) {
   internal->windef = malloc(sizeof(zxwin) + 1);
 }
 
+typedef struct zxinfo {
+  zx *internal;
+  xcb_helper_struct *s;
+} zxinfo;
+
+void add_win_list(i3ipcCon *win, zxinfo *info) {
+  gchar *win_name;
+  g_object_get(win, "name", &win_name, NULL);
+
+  add_win(info->internal, info->s, win_name);
+
+  g_object_unref(win);
+}
+
+void scan_scratchpad(i3ipcCon *win, zxinfo *info) {
+  GList *scwin;
+  scwin = (GList*)i3ipc_con_get_nodes(win);
+  g_list_foreach(scwin, (GFunc)add_win_list, info);
+  g_object_unref(win);
+}
+
+static void win_callback(GObject *object, i3ipcWorkspaceEvent *event, gpointer user_data) {
+  printf("test\n");
+  redraw = 1;
+}
+
 void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
   clear_windows_main(zs, _s);
   i3ipcConnection *conn;
-  GSList *reply;
+  i3ipcCon *reply;
+  GError *err = NULL;
 
   conn = i3ipc_connection_new(NULL, NULL);
-  reply = i3ipc_connection_get_workspaces(conn, NULL);
+  reply = i3ipc_connection_get_tree(conn, &err);
 
-  GSList *node;
-  for (int i = 0; node = g_slist_nth(reply, i); i++) {
-    i3ipcWorkspaceReply *nodetmp = node->data;
-    g_print ("%s\n", nodetmp->output);
+  if (err) {
+    zx_log(zs, "ERROR! Error calling i3ipc_connection_get_tree!\n");
+    events = 0;
+    return;
   }
 
-  g_slist_free(reply);
+  i3ipcCon *scratchpad;
+  scratchpad = i3ipc_con_scratchpad(reply);
+
+  GList *scnode;
+  scnode = (GList*)i3ipc_con_get_floating_nodes(scratchpad);
+
+  zxinfo *info = malloc(sizeof(_s) + sizeof(zs) + 1);
+  info->s = _s;
+  info->internal = zs;
+
+  g_list_foreach(scnode, (GFunc)scan_scratchpad, info);
+
+  i3ipcCommandReply *cr;
+  cr = i3ipc_connection_subscribe(conn, I3IPC_EVENT_WORKSPACE, &err);
+
+  if (err || !cr) {
+    zx_log(zs, "ERROR! Could not subscribe to I3IPC_EVENT_WINDOW!");
+    events = 0;
+    return;
+  }
+
+  if (!cr->success) {
+    char temp[128];
+    sprintf(temp, "ERROR! An error occured while subscribing to i3 event: %s", cr->error);
+    zx_log(zs, strdup(temp));
+    events = 0;
+    return;
+  }
+
+  g_signal_connect(conn, "workspace", G_CALLBACK(win_callback), NULL);
+  printf("signal\n");
+
+  i3ipc_command_reply_free(cr);
+  g_object_unref(reply);
   g_object_unref(conn);
-  add_win(zs, _s, "Google Chrome");
-  add_win(zs, _s, "URxvt");
-  add_win(zs, _s, "test233333");
-  add_win(zs, _s, "test233333");
+  g_object_unref(scratchpad);
+
   scan_width(zs, _s);
   draw_windows(zs, _s);
 }
-
-void get_wins(xcb_helper_struct *_s) {
-  char **res[128][128];
-  int len;
-
-  strcpy((char * restrict)res[0], "test");
-  len++;
-}
-
-static int events = 1;
 
 void sighandle(int signal) {
   if (signal == SIGINT || signal == SIGTERM) {
@@ -169,6 +245,9 @@ int main(int argc, char **argv) {
     struct xcb_helper_struct *_s = malloc(sizeof(xcb_helper_struct) + 1);
     struct zx *zs = malloc(sizeof(zx) + 1 + sizeof(zxwin) + 1);
     zs->windows = 0;
+
+    zx_log_init(zs);
+
     zx_config(_s);
 
     on_exit(xcb_h_destroy, (void*)_s);
@@ -180,13 +259,12 @@ int main(int argc, char **argv) {
 
     xcb_h_map(_s);
 
-    get_wins(_s);
     xcb_h_setup_font(_s, "fixed", 0xFFFFFF);
 
     FL(_s);
 
-    XCBPOLL(_s, events)
-    XCBEX(_s, zs, draw_wins_main)
+    XCBPOLL(events)
+    XCBEX(_s, zs, draw_wins_main, clear_window, redraw)
     break;
     XCBPE()
 
