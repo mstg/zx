@@ -42,39 +42,6 @@
 */
 
 #include <xcb/xcb.h>
-#define true 1
-
-const char *atom_names[] = {
-    "_NET_WM_WINDOW_TYPE",
-    "_NET_WM_WINDOW_TYPE_DOCK",
-    "_NET_WM_DESKTOP",
-    "_NET_WM_STRUT_PARTIAL",
-    "_NET_WM_STRUT",
-    "_NET_WM_STATE",
-    "_NET_WM_STATE_STICKY",
-    "_NET_WM_STATE_ABOVE",
-};
-
-enum {
-    NET_WM_WINDOW_TYPE,
-    NET_WM_WINDOW_TYPE_DOCK,
-    NET_WM_DESKTOP,
-    NET_WM_STRUT_PARTIAL,
-    NET_WM_STRUT,
-    NET_WM_STATE,
-    NET_WM_STATE_STICKY,
-    NET_WM_STATE_ABOVE,
-};
-
-typedef struct zxInternal {
-    xcb_connection_t *c;
-    xcb_window_t window;
-    xcb_atom_t atom_list[10];
-    xcb_screen_t *screen;
-    int x;
-    int width;
-    int height;
-} zxInternal;
 
 typedef union rgba_t {
     struct {
@@ -85,3 +52,16 @@ typedef union rgba_t {
     };
     uint32_t v;
 } rgba_t;
+
+typedef struct zxwin {
+  char *title;
+  int title_len;
+  int x;
+  int width;
+  xcb_rectangle_t win_rect[4];
+} zxwin;
+
+typedef struct zx {
+  int windows;
+  zxwin **windef;
+} zx;
