@@ -85,10 +85,10 @@ void xcb_h_gc_setup(xcb_helper_struct *internal) {
   uint32_t mask = XCB_GC_FOREGROUND;
   uint32_t value[] = { internal->background, 0 };
 
-  xcb_create_gc(internal->c, internal->gc[0], internal->window, mask, value);
+  xcb_create_gc(internal->c, internal->gc[GC0], internal->window, mask, value);
 
   internal->gc[GC1] = xcb_generate_id(internal->c);
-  xcb_create_gc(internal->c, internal->gc[GC1], internal->window, mask, value);
+  xcb_create_gc(internal->c, internal->gc[GC1], internal->window, mask, (uint32_t[]){ internal->rect_border, 0 });
 
   internal->gc[GC2] = xcb_generate_id(internal->c);
   xcb_create_gc(internal->c, internal->gc[GC2], internal->window, mask, value);

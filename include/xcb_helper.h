@@ -59,6 +59,7 @@ typedef struct xcb_helper_struct {
   int width;
   int height;
   unsigned long background;
+  unsigned long rect_border;
 } xcb_helper_struct;
 
 void xcb_h_setup(xcb_helper_struct *internal);

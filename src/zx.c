@@ -59,6 +59,7 @@ void zx_config(xcb_helper_struct *_s) {
     _s->width =1920;
     _s->height = 25;
     _s->background = 0x2C3E50;
+    _s->rect_border = 0x7F8C8D;
 }
 
 void xcb_change(xcb_helper_struct *_s) {
@@ -124,8 +125,6 @@ void scan_width(zx *_s, xcb_helper_struct *zs) {
 
     _s->windef[i]->win_rect->x = x;
     _s->windef[i]->win_rect->width = width;
-
-    printf("%d; %d - %d\n", i, width, x);
   }
 }
 
@@ -185,7 +184,14 @@ void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
   i3ipcCon *reply;
   GError *err = NULL;
 
-  zs->conn = i3ipc_connection_new(NULL, NULL);
+  zs->conn = i3ipc_connection_new(NULL, &err);
+
+  if (err) {
+    zx_log(zs, "ERROR! Could not make a i3 ipc connection!");
+    events = 0;
+    return;
+  }
+
   reply = i3ipc_connection_get_tree(zs->conn, &err);
 
   if (err) {
