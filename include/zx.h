@@ -21,6 +21,7 @@
 */
 
 #include <xcb/xcb.h>
+#include <i3ipc-glib/i3ipc-glib.h>
 
 typedef union rgba_t {
     struct {
@@ -44,4 +45,5 @@ typedef struct zx {
   int windows;
   zxwin **windef;
   FILE *log_file;
+  i3ipcConnection *conn;
 } zx;

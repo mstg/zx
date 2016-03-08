@@ -21,7 +21,6 @@
 */
 
 #include <glib.h>
-#include <glib/gprintf.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -32,11 +31,10 @@
 
 #include "zx.h"
 #include "xcb_helper.h"
-#include <i3ipc-glib/i3ipc-glib.h>
 
 static int events = 1;
 static int redraw = 0;
-static int times = 0;
+static GMainLoop *main_loop = NULL;
 
 void zx_log_init(zx *internal) {
   const char *homedir;
@@ -174,19 +172,21 @@ void scan_scratchpad(i3ipcCon *win, zxinfo *info) {
   g_object_unref(win);
 }
 
-static void win_callback(GObject *object, i3ipcWorkspaceEvent *event, gpointer user_data) {
-  printf("test\n");
+void win_callback(i3ipcConnection *conn, i3ipcWorkspaceEvent *e, gpointer zs) {
+  if (main_loop) {
+    g_main_loop_quit(main_loop);
+    main_loop = NULL;
+  }
   redraw = 1;
 }
 
 void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
   clear_windows_main(zs, _s);
-  i3ipcConnection *conn;
   i3ipcCon *reply;
   GError *err = NULL;
 
-  conn = i3ipc_connection_new(NULL, NULL);
-  reply = i3ipc_connection_get_tree(conn, &err);
+  zs->conn = i3ipc_connection_new(NULL, NULL);
+  reply = i3ipc_connection_get_tree(zs->conn, &err);
 
   if (err) {
     zx_log(zs, "ERROR! Error calling i3ipc_connection_get_tree!\n");
@@ -207,7 +207,7 @@ void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
   g_list_foreach(scnode, (GFunc)scan_scratchpad, info);
 
   i3ipcCommandReply *cr;
-  cr = i3ipc_connection_subscribe(conn, I3IPC_EVENT_WORKSPACE, &err);
+  cr = i3ipc_connection_subscribe(zs->conn, I3IPC_EVENT_WINDOW, &err);
 
   if (err || !cr) {
     zx_log(zs, "ERROR! Could not subscribe to I3IPC_EVENT_WINDOW!");
@@ -223,21 +223,24 @@ void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
     return;
   }
 
-  g_signal_connect(conn, "workspace", G_CALLBACK(win_callback), NULL);
-  printf("signal\n");
+  g_signal_connect(zs->conn, "window", G_CALLBACK(win_callback), zs);
+  main_loop = g_main_loop_new(NULL, FALSE);
 
   i3ipc_command_reply_free(cr);
   g_object_unref(reply);
-  g_object_unref(conn);
   g_object_unref(scratchpad);
 
   scan_width(zs, _s);
   draw_windows(zs, _s);
+
+  g_main_loop_run(main_loop);
 }
 
 void sighandle(int signal) {
   if (signal == SIGINT || signal == SIGTERM) {
     events = 0;
+    g_main_loop_quit(main_loop);
+    g_main_loop_unref(main_loop);
   }
 }
 
@@ -270,6 +273,9 @@ int main(int argc, char **argv) {
 
     if (zs->windef)
       free(zs->windef);
+
+    if (zs->conn)
+      g_object_unref(zs->conn);
 
     free(zs);
     printf("Terminating..\n");
