@@ -6,4 +6,5 @@ This is just working. Nothing else is added yet. You can change config in the zx
 
 # TODO
 * Parse config from somewhere
-* Go through zx.c and look for memory leak (sorry)
+* Go through zx.c and look for memory leaks (sorry)
+* Detect workspace (For now it only pushes the windows to workspace 1)
