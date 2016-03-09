@@ -79,9 +79,9 @@ void xcb_change(xcb_helper_struct *_s) {
     xcb_h_change_wmname(_s, "zx", 2);
 }
 
-void add_windef(zx *_s, int index, const char *label) {
-  _s->windef = realloc(_s->windef, sizeof(zxwin)*_s->windows + 1 + sizeof(zxwin) + 1);
-  _s->windef[index] = malloc(sizeof(zxwin) + 1 + sizeof(char*) + sizeof(int)*3);
+void add_windef(zx *_s, int index, const char *label, int id, i3ipcCon *con) {
+  _s->windef = realloc(_s->windef, sizeof(zxwin)*_s->windows + 1 + sizeof(zxwin) + 1 + sizeof(label) + sizeof(id) + sizeof(con) + 1);
+  _s->windef[index] = malloc(sizeof(zxwin) + 1 + sizeof(char*) + sizeof(int)*3 + sizeof(label) + sizeof(id) + sizeof(con) + 1);
   _s->windows++;
 }
 
@@ -89,30 +89,31 @@ int width_for_rect(zx *_s, xcb_helper_struct *zs) {
   if (_s->windows <= 0)
     return zs->width-3;
 
-
   int initial = (zs->width/(_s->windows))-3;
 
   return initial;
 }
 
-char *winatx(int x, zx *internal) {
-  char *ret = malloc(128);
+zxwin *winatx(int x, zx *internal) {
+  zxwin *ret = malloc(sizeof(zxwin)+sizeof(i3ipcCon*));
   for (int i = 0; i < internal->windows; i++) {
     if (internal->windef[i]->x <= x) {
-      strcpy(ret, internal->windef[i]->title);
+      ret = internal->windef[i];
     }
   }
 
   return ret;
 }
 
-void add_win(zx *_s, xcb_helper_struct *zs, const char *label) {
-  add_windef(_s, _s->windows, label);
+void add_win(zx *_s, xcb_helper_struct *zs, const char *label, int id, i3ipcCon *con) {
+  add_windef(_s, _s->windows, label, id, con);
 
   _s->windef[_s->windows-1]->width = 0;
   _s->windef[_s->windows-1]->x = 0;
   _s->windef[_s->windows-1]->title = (char*)label;
   _s->windef[_s->windows-1]->title_len = strlen(label);
+  _s->windef[_s->windows-1]->id = id;
+  _s->windef[_s->windows-1]->con = con;
 
   xcb_rectangle_t win_rect[] = {
     0, 0, 0, zs->height-2
@@ -173,16 +174,16 @@ void add_win_list(i3ipcCon *win, zxinfo *info) {
   gchar *win_name;
   g_object_get(win, "name", &win_name, NULL);
 
-  add_win(info->internal, info->s, win_name);
+  gint id;
+  g_object_get(win, "id", &id, NULL);
 
-  g_object_unref(win);
+  add_win(info->internal, info->s, win_name, id, win);
 }
 
 void scan_scratchpad(i3ipcCon *win, zxinfo *info) {
   GList *scwin;
   scwin = (GList*)i3ipc_con_get_nodes(win);
   g_list_foreach(scwin, (GFunc)add_win_list, info);
-  g_object_unref(win);
 }
 
 void win_callback(i3ipcConnection *conn, i3ipcWorkspaceEvent *e, gpointer zs) {
@@ -264,9 +265,9 @@ void *bg_thread(void *arg) {
       case XCB_BUTTON_PRESS:
         _s->press_ev = (xcb_button_press_event_t*)_s->event;
         int x = _s->press_ev->event_x;
-        char *winname = winatx(x, zs);
-        printf("%s\n", winname);
-        free(winname);
+        zxwin *win = winatx(x, zs);
+        i3ipc_con_command(win->con, "move window to workspace 1; floating toggle", NULL);
+        free(win);
         break;
       }
     }

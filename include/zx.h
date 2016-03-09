@@ -39,6 +39,8 @@ typedef struct zxwin {
   int x;
   int width;
   xcb_rectangle_t win_rect[4];
+  int id;
+  i3ipcCon *con;
 } zxwin;
 
 typedef struct zx {
