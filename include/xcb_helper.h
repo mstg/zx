@@ -53,6 +53,7 @@ typedef struct xcb_helper_struct {
   xcb_gcontext_t gc[4];
   xcb_generic_event_t *event;
   xcb_expose_event_t *expose_ev;
+  xcb_button_press_event_t *press_ev;
   xcb_font_t font;
   int count;
   int x;
@@ -92,27 +93,3 @@ void xcb_h_destroy(int exit_status, void *internal);
 
 #define FL(internal) \
   xcb_flush(internal->c);
-
-
-#define XCBPOLL(var) \
-  while(var) {
-
-#define XCBEX(internal, ints, func, clear_func, redraw) \
-  if (redraw) { \
-    clear_func(internal, ints); \
-    func(internal, ints); \
-    FL(internal) \
-  } \
-  if ((internal->event = xcb_poll_for_event(internal->c))) { \
-    internal->expose_ev = (xcb_expose_event_t*)internal->event; \
-    switch (internal->event->response_type & 0x7F) { \
-      case XCB_EXPOSE: \
-        if (internal->expose_ev->count == 0) { \
-          func(internal, ints); \
-        } \
-        FL(internal);
-
-#define XCBPE() \
-      } \
-    } \
-  }

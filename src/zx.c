@@ -28,13 +28,16 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "zx.h"
 #include "xcb_helper.h"
 
 static int events = 1;
 static int redraw = 0;
+static int signal_att = 0;
 static GMainLoop *main_loop = NULL;
+static pthread_t bgt;
 
 void zx_log_init(zx *internal) {
   const char *homedir;
@@ -90,6 +93,17 @@ int width_for_rect(zx *_s, xcb_helper_struct *zs) {
   int initial = (zs->width/(_s->windows))-3;
 
   return initial;
+}
+
+char *winatx(int x, zx *internal) {
+  char *ret = malloc(128);
+  for (int i = 0; i < internal->windows; i++) {
+    if (internal->windef[i]->x <= x) {
+      strcpy(ret, internal->windef[i]->title);
+    }
+  }
+
+  return ret;
 }
 
 void add_win(zx *_s, xcb_helper_struct *zs, const char *label) {
@@ -172,10 +186,6 @@ void scan_scratchpad(i3ipcCon *win, zxinfo *info) {
 }
 
 void win_callback(i3ipcConnection *conn, i3ipcWorkspaceEvent *e, gpointer zs) {
-  if (main_loop) {
-    g_main_loop_quit(main_loop);
-    main_loop = NULL;
-  }
   redraw = 1;
 }
 
@@ -184,12 +194,14 @@ void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
   i3ipcCon *reply;
   GError *err = NULL;
 
-  zs->conn = i3ipc_connection_new(NULL, &err);
+  if (!zs->conn) {
+    zs->conn = i3ipc_connection_new(NULL, &err);
 
-  if (err) {
-    zx_log(zs, "ERROR! Could not make a i3 ipc connection!");
-    events = 0;
-    return;
+    if (err) {
+      zx_log(zs, "ERROR! Could not make an i3 ipc connection!\n");
+      events = 0;
+      return;
+    }
   }
 
   reply = i3ipc_connection_get_tree(zs->conn, &err);
@@ -212,42 +224,55 @@ void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
 
   g_list_foreach(scnode, (GFunc)scan_scratchpad, info);
 
-  i3ipcCommandReply *cr;
-  cr = i3ipc_connection_subscribe(zs->conn, I3IPC_EVENT_WINDOW, &err);
-
-  if (err || !cr) {
-    zx_log(zs, "ERROR! Could not subscribe to I3IPC_EVENT_WINDOW!");
-    events = 0;
-    return;
-  }
-
-  if (!cr->success) {
-    char temp[128];
-    sprintf(temp, "ERROR! An error occured while subscribing to i3 event: %s", cr->error);
-    zx_log(zs, strdup(temp));
-    events = 0;
-    return;
-  }
-
-  g_signal_connect(zs->conn, "window", G_CALLBACK(win_callback), zs);
-  main_loop = g_main_loop_new(NULL, FALSE);
-
-  i3ipc_command_reply_free(cr);
   g_object_unref(reply);
   g_object_unref(scratchpad);
 
   scan_width(zs, _s);
   draw_windows(zs, _s);
-
-  g_main_loop_run(main_loop);
 }
 
 void sighandle(int signal) {
   if (signal == SIGINT || signal == SIGTERM) {
     events = 0;
-    g_main_loop_quit(main_loop);
-    g_main_loop_unref(main_loop);
+    if (main_loop) {
+      g_main_loop_quit(main_loop);
+      g_main_loop_unref(main_loop);
+    }
   }
+}
+
+void *bg_thread(void *arg) {
+  const zxinfo *inf = (zxinfo*)arg;
+  xcb_helper_struct *_s = inf->s;
+  zx *zs = inf->internal;
+  while (events) {
+    if (redraw) {
+      clear_window(_s, zs);
+      draw_wins_main(_s, zs);
+      FL(_s)
+      redraw = 0;
+    }
+    if ((_s->event = xcb_poll_for_event(_s->c))) {
+      switch (_s->event->response_type & 0x7F) {
+        case XCB_EXPOSE:
+          _s->expose_ev = (xcb_expose_event_t*)_s->event;
+          if (_s->expose_ev->count == 0) {
+            draw_wins_main(_s, zs);
+          }
+          FL(_s);
+          break;
+      case XCB_BUTTON_PRESS:
+        _s->press_ev = (xcb_button_press_event_t*)_s->event;
+        int x = _s->press_ev->event_x;
+        char *winname = winatx(x, zs);
+        printf("%s\n", winname);
+        free(winname);
+        break;
+      }
+    }
+  }
+
+  return NULL;
 }
 
 int main(int argc, char **argv) {
@@ -272,10 +297,40 @@ int main(int argc, char **argv) {
 
     FL(_s);
 
-    XCBPOLL(events)
-    XCBEX(_s, zs, draw_wins_main, clear_window, redraw)
-    break;
-    XCBPE()
+    zxinfo *info = malloc(sizeof(_s) + sizeof(zs) + 1);
+    info->s = _s;
+    info->internal = zs;
+    main_loop = g_main_loop_new(NULL, FALSE);
+    int perr = pthread_create(&bgt, NULL, bg_thread, (void*)info);
+
+    if(perr) {
+      zx_log(zs, "ERROR! pthread_create failed!\n");
+    }
+
+    while (!zs->conn);
+    GError *err = NULL;
+    i3ipcCommandReply *cr;
+    cr = i3ipc_connection_subscribe(zs->conn, I3IPC_EVENT_WINDOW, &err);
+
+    if (err || !cr) {
+      zx_log(zs, "ERROR! Could not subscribe to I3IPC_EVENT_WINDOW!\n");
+      events = 0;
+    }
+
+    if (!cr->success) {
+      char temp[128];
+      sprintf(temp, "ERROR! An error occured while subscribing to i3 event: %s\n", cr->error);
+      zx_log(zs, strdup(temp));
+      events = 0;
+    }
+
+    g_signal_connect(zs->conn, "window", G_CALLBACK(win_callback), zs);
+
+    i3ipc_command_reply_free(cr);
+
+    g_main_loop_run(main_loop);
+
+    pthread_join(bgt, NULL);
 
     if (zs->windef)
       free(zs->windef);
