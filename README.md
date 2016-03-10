@@ -1,15 +1,28 @@
 # zx
 i3 scratchpad manager
 
-# Alpha
-This is just working. Nothing else is added yet. You can change config in the zx_config function in src/zx.c
+# Status
+This is fully working, very little tested.
 
 # Requirements
 * i3ipc-glib
 * glib
 * libxcb
 
-# TODO
-* Parse config from somewhere
-* Go through zx.c and look for memory leaks (sorry)
-* ~~Detect workspace (For now it only pushes the windows to workspace 1)~~ (Done)
+# Installation
+Install the requirements then run `make` then `sudo make install`
+
+You can run this from your i3 config to run on startup
+
+# Config
+You can configure zx with a config file in ~/.zxconfig
+
+Example config file:
+```
+[zx]
+background=0x2C3E50
+border_color=0x7F8C8D
+border=1
+floating=0
+font_color=0xFFFFFF
+```

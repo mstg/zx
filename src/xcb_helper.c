@@ -138,13 +138,13 @@ void xcb_h_draw_fill_rect(xcb_helper_struct *internal, int gcnum, int num, xcb_r
   xcb_poly_fill_rectangle(internal->c, internal->window, internal->gc[gcnum], num, rect);
 }
 
-void xcb_h_setup_font(xcb_helper_struct *internal, const char *fontname, unsigned long fontcolor) {
+void xcb_h_setup_font(xcb_helper_struct *internal, const char *fontname) {
   internal->font = xcb_generate_id (internal->c);
   xcb_void_cookie_t font_c = xcb_open_font_checked(internal->c, internal->font, strlen(fontname), fontname);
   xcb_h_check_cookie(internal, font_c, "cant open font");
 
   internal->gc[GC_FONT] = xcb_generate_id(internal->c);
-  xcb_create_gc(internal->c, internal->gc[GC_FONT], internal->window, XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT, (const uint32_t[]){ fontcolor,
+  xcb_create_gc(internal->c, internal->gc[GC_FONT], internal->window, XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT, (const uint32_t[]){ internal->font_color,
     internal->background, internal->font });
 }
 

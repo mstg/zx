@@ -61,6 +61,8 @@ typedef struct xcb_helper_struct {
   int height;
   unsigned long background;
   unsigned long rect_border;
+  unsigned long font_color;
+  int border;
 } xcb_helper_struct;
 
 void xcb_h_setup(xcb_helper_struct *internal);
@@ -85,7 +87,7 @@ void xcb_h_draw_rect(xcb_helper_struct *internal, int gcnum, int num, xcb_rectan
 
 void xcb_h_draw_fill_rect(xcb_helper_struct *internal, int gcnum, int num, xcb_rectangle_t rect[]);
 
-void xcb_h_setup_font(xcb_helper_struct *internal, const char *fontname, unsigned long fontcolor);
+void xcb_h_setup_font(xcb_helper_struct *internal, const char *fontname);
 
 int xcb_h_draw_text(xcb_helper_struct *internal, int gcnum, int x, int y, const char *text);
 

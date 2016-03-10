@@ -40,10 +40,22 @@ static GMainLoop *main_loop = NULL;
 static pthread_t bgt;
 
 void zx_log_init(zx *internal) {
-  const char *homedir;
+  char *homedir;
   if ((homedir = getenv("HOME")) == NULL) {
       homedir = getpwuid(getuid())->pw_dir;
   }
+
+  gsize l;
+  GError *err = NULL;
+  homedir = g_locale_to_utf8(homedir, -1, NULL, &l, &err);
+
+  if (err) {
+      fprintf(stderr, "ERROR! Could not convert homedir to UTF-8");
+      events = 0;
+      return;
+  }
+
+  internal->homedir = homedir;
 
   char logfile[128];
   sprintf(logfile, "%s/.zx.log", homedir);
@@ -53,16 +65,82 @@ void zx_log_init(zx *internal) {
 
 void zx_log(zx *internal, const char *log_) {
   if (internal->log_file) fprintf(internal->log_file, log_);
-  printf(log_);
+  fprintf(stderr, log_);
 }
 
-void zx_config(xcb_helper_struct *_s) {
-    // TODO: Actually parse config here
+void zx_config(xcb_helper_struct *_s, zx *zs) {
+    // Const values (Auto defined)
     _s->x = 0;
     _s->width = 0;
     _s->height = 25;
-    _s->background = 0x2C3E50;
-    _s->rect_border = 0x7F8C8D;
+
+    typedef struct options {
+        unsigned long long_value;
+        int num_value;
+    } options;
+
+    options **_opts = malloc(sizeof(options)+sizeof(int)*4+sizeof(unsigned long)*3+1);
+    int count_def = 5;
+
+    for (int i = 0; i < count_def; i++) {
+        _opts[i] = malloc(sizeof(int)+sizeof(unsigned long));
+    }
+
+    _opts[0]->long_value = 0x2C3E50;
+    _opts[1]->long_value = 0x7F8C8D;
+    _opts[2]->num_value = 1;
+    _opts[3]->num_value = 0;
+    _opts[4]->long_value = 0xFFFFFF;
+
+    char config_path[255];
+    sprintf(config_path, "%s/.zxconfig", zs->homedir);
+
+    GKeyFile* gkf = g_key_file_new();
+
+    if (!g_key_file_load_from_file(gkf, config_path, G_KEY_FILE_NONE, NULL)){
+        fprintf (stderr, "WARNING! Could not read config file %s! No config file present\n", config_path);
+        _s->background = _opts[0]->long_value;
+        _s->rect_border = _opts[1]->long_value;
+        _s->border = _opts[2]->num_value;
+        zs->floating = _opts[3]->num_value;
+        _s->font_color = _opts[4]->long_value;
+        free(_opts);
+        return;
+    }
+
+    char *opts[] = {"background", "border_color", "border", "floating", "font_color"};
+    char *opts_type[] = {"ul", "ul", "int", "int", "ul"};
+
+    GError *err = NULL;
+
+    for (int i = 0; i < count_def; i++) {
+        if (strcmp(opts_type[i], "int") == 0) {
+            int t = g_key_file_get_integer (gkf, "zx", opts[i], &err);
+            if (!err) {
+                _opts[i]->num_value = t;
+            }
+        } else if (strcmp(opts_type[i], "ul") == 0) {
+            char *temp = g_key_file_get_value(gkf, "zx", opts[i], &err);
+            if (!err) {
+                unsigned long t = strtoul(temp, NULL, 0);
+                _opts[i]->long_value = t;
+            }
+        }
+        err = NULL;
+    }
+
+    _s->background = _opts[0]->long_value;
+    _s->rect_border = _opts[1]->long_value;
+    _s->border = _opts[2]->num_value;
+    zs->floating = _opts[3]->num_value;
+    _s->font_color = _opts[4]->long_value;
+
+    if (_s->border == 0) {
+        _s->rect_border = _s->background;
+    }
+
+    g_key_file_free(gkf);
+    free(_opts);
 }
 
 void xcb_change(xcb_helper_struct *_s) {
@@ -154,8 +232,6 @@ void scan_width(zx *_s, xcb_helper_struct *zs) {
 void draw_windows(zx *_s, xcb_helper_struct *zs) {
   for (int i = 0; i < _s->windows; i++) {
     xcb_h_draw_rect(zs, GC1, 1, _s->windef[i]->win_rect);
-
-    xcb_h_change_fontc_gc(zs, GC_FONT, 0xFFFFFF);
     xcb_h_draw_text(zs, GC_FONT, _s->windef[i]->x+_s->windef[i]->width/2-(_s->windef[i]->title_len*2), zs->height-10, _s->windef[i]->title);
   }
 }
@@ -279,6 +355,9 @@ void *bg_thread(void *arg) {
             zx_log(zs, "ERROR! Error moving window to workspace!\n");
             events = 0;
           }
+
+          if (!zs->floating)
+            i3ipc_con_command(win->con, "floating toggle", NULL);
         }
         break;
       }
@@ -324,14 +403,18 @@ int main(int argc, char **argv) {
     struct zx *zs = malloc(sizeof(zx) + 1 + sizeof(zxwin) + 1);
     zs->windows = 0;
     zs->active_workspace = 1;
+    zs->conn = NULL;
 
     zx_log_init(zs);
 
-    zx_config(_s);
+    zx_config(_s, zs);
 
     on_exit(xcb_h_destroy, (void*)_s);
     signal(SIGINT, sighandle);
     signal(SIGTERM, sighandle);
+
+    if (!events)
+        goto done;
 
     GError *err = NULL;
     zs->conn = i3ipc_connection_new(NULL, &err);
@@ -362,7 +445,7 @@ int main(int argc, char **argv) {
 
     xcb_h_map(_s);
 
-    xcb_h_setup_font(_s, "fixed", 0xFFFFFF);
+    xcb_h_setup_font(_s, "fixed");
 
     FL(_s);
 

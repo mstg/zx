@@ -49,4 +49,6 @@ typedef struct zx {
   FILE *log_file;
   i3ipcConnection *conn;
   int active_workspace;
+  int floating;
+  char *homedir;
 } zx;
