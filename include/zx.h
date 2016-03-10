@@ -48,4 +48,5 @@ typedef struct zx {
   zxwin **windef;
   FILE *log_file;
   i3ipcConnection *conn;
+  int active_workspace;
 } zx;

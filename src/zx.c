@@ -59,7 +59,7 @@ void zx_log(zx *internal, const char *log_) {
 void zx_config(xcb_helper_struct *_s) {
     // TODO: Actually parse config here
     _s->x = 0;
-    _s->width =1920;
+    _s->width = 0;
     _s->height = 25;
     _s->background = 0x2C3E50;
     _s->rect_border = 0x7F8C8D;
@@ -96,10 +96,18 @@ int width_for_rect(zx *_s, xcb_helper_struct *zs) {
 
 zxwin *winatx(int x, zx *internal) {
   zxwin *ret = malloc(sizeof(zxwin)+sizeof(i3ipcCon*));
+
+  int found = 0;
   for (int i = 0; i < internal->windows; i++) {
     if (internal->windef[i]->x <= x) {
       ret = internal->windef[i];
+      found = 1;
     }
+  }
+
+  if (!found) {
+    free(ret);
+    ret = NULL;
   }
 
   return ret;
@@ -235,10 +243,6 @@ void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
 void sighandle(int signal) {
   if (signal == SIGINT || signal == SIGTERM) {
     events = 0;
-    if (main_loop) {
-      g_main_loop_quit(main_loop);
-      g_main_loop_unref(main_loop);
-    }
   }
 }
 
@@ -264,22 +268,62 @@ void *bg_thread(void *arg) {
           break;
       case XCB_BUTTON_PRESS:
         _s->press_ev = (xcb_button_press_event_t*)_s->event;
+        GError *err = NULL;
         int x = _s->press_ev->event_x;
         zxwin *win = winatx(x, zs);
-        i3ipc_con_command(win->con, "move window to workspace 1; floating toggle", NULL);
-        free(win);
+        if (win) {
+          char command[255];
+          sprintf(command, "move window to workspace %d;", zs->active_workspace, zs->active_workspace);
+          i3ipc_con_command(win->con, command, &err);
+          if (err) {
+            zx_log(zs, "ERROR! Error moving window to workspace!\n");
+            events = 0;
+          }
+        }
         break;
       }
     }
   }
 
+  if (main_loop) {
+    g_main_loop_quit(main_loop);
+    g_main_loop_unref(main_loop);
+  }
+
   return NULL;
+}
+
+void workspace_callback(i3ipcConnection *conn, i3ipcWorkspaceEvent *e, zx *zs) {
+  if (zs->windows == 0) return;
+  if (strcmp(e->change, "focus") == 0) {
+    // Why doesn't i3ipc_con provide the workspace num?
+    GError *err = NULL;
+    GSList *workspaces = i3ipc_connection_get_workspaces(zs->conn, &err);
+
+    if (err) {
+      zx_log(zs, "ERROR! Error calling i3ipc_connection_get_workspaces!\n");
+      events = 0;
+      return;
+    }
+
+    i3ipcWorkspaceReply *workspace;
+
+    for (GSList *el = workspaces; el; el = el->next) {
+      workspace = (i3ipcWorkspaceReply*)el->data;
+      if (workspace->focused == TRUE) {
+        zs->active_workspace = workspace->num;
+        break;
+      }
+      i3ipc_workspace_reply_free(workspace);
+    }
+  }
 }
 
 int main(int argc, char **argv) {
     struct xcb_helper_struct *_s = malloc(sizeof(xcb_helper_struct) + 1);
     struct zx *zs = malloc(sizeof(zx) + 1 + sizeof(zxwin) + 1);
     zs->windows = 0;
+    zs->active_workspace = 1;
 
     zx_log_init(zs);
 
@@ -289,7 +333,31 @@ int main(int argc, char **argv) {
     signal(SIGINT, sighandle);
     signal(SIGTERM, sighandle);
 
+    GError *err = NULL;
+    zs->conn = i3ipc_connection_new(NULL, &err);
+
+    if (err) {
+      zx_log(zs, "ERROR! Could not make an i3 ipc connection!\n");
+      goto done;
+    }
+
+    GSList *outputs = i3ipc_connection_get_outputs(zs->conn, &err);
+    if (err) {
+      zx_log(zs, "ERROR! Could not get i3 outputs!\n");
+      goto done;
+    }
+
+    for (GSList *el = outputs; el; el = el->next) {
+      i3ipcOutputReply *output = (i3ipcOutputReply*)el->data;
+      // TODO: Add multi monitor support
+      if (!_s->width) {
+        _s->width = output->rect->width;
+      }
+      i3ipc_output_reply_free(output);
+    }
+
     xcb_h_setup(_s);
+
     xcb_change(_s);
 
     xcb_h_map(_s);
@@ -309,23 +377,40 @@ int main(int argc, char **argv) {
     }
 
     while (!zs->conn);
-    GError *err = NULL;
     i3ipcCommandReply *cr;
     cr = i3ipc_connection_subscribe(zs->conn, I3IPC_EVENT_WINDOW, &err);
 
     if (err || !cr) {
       zx_log(zs, "ERROR! Could not subscribe to I3IPC_EVENT_WINDOW!\n");
-      events = 0;
+      goto done;
     }
 
     if (!cr->success) {
       char temp[128];
       sprintf(temp, "ERROR! An error occured while subscribing to i3 event: %s\n", cr->error);
       zx_log(zs, strdup(temp));
-      events = 0;
+      goto done;
     }
 
     g_signal_connect(zs->conn, "window", G_CALLBACK(win_callback), zs);
+
+    i3ipc_command_reply_free(cr);
+
+    cr = i3ipc_connection_subscribe(zs->conn, I3IPC_EVENT_WORKSPACE, &err);
+
+    if (err || !cr) {
+      zx_log(zs, "ERROR! Could not subscribe to I3IPC_EVENT_WORKSPACE!\n");
+      goto done;
+    }
+
+    if (!cr->success) {
+      char temp[128];
+      sprintf(temp, "ERROR! An error occured while subscribing to i3 event: %s\n", cr->error);
+      zx_log(zs, strdup(temp));
+      goto done;
+    }
+
+    g_signal_connect(zs->conn, "workspace", G_CALLBACK(workspace_callback), zs);
 
     i3ipc_command_reply_free(cr);
 
@@ -333,6 +418,9 @@ int main(int argc, char **argv) {
 
     pthread_join(bgt, NULL);
 
+    goto done;
+
+done:
     if (zs->windef)
       free(zs->windef);
 
