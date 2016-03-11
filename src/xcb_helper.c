@@ -103,6 +103,12 @@ void xcb_h_setup(xcb_helper_struct *internal) {
 
 void xcb_h_map(xcb_helper_struct *internal) {
   xcb_map_window(internal->c, internal->window);
+  internal->mapped = 1;
+}
+
+void xcb_h_unmap(xcb_helper_struct *internal) {
+  xcb_unmap_window(internal->c, internal->window);
+  internal->mapped = 0;
 }
 
 void xcb_h_change_property(xcb_helper_struct *internal, int mode, int wm, int atom, int m, int m1, int type) {

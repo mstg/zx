@@ -38,6 +38,7 @@ static int redraw = 0;
 static int signal_att = 0;
 static GMainLoop *main_loop = NULL;
 static pthread_t bgt;
+static int visible = 1;
 
 void zx_log_init(zx *internal) {
   char *homedir;
@@ -80,7 +81,7 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
     } options;
 
     options **_opts = malloc(sizeof(options)+sizeof(int)*4+sizeof(unsigned long)*3+1);
-    int count_def = 5;
+    int count_def = 6;
 
     for (int i = 0; i < count_def; i++) {
         _opts[i] = malloc(sizeof(int)+sizeof(unsigned long));
@@ -91,6 +92,7 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
     _opts[2]->num_value = 1;
     _opts[3]->num_value = 0;
     _opts[4]->long_value = 0xFFFFFF;
+    _opts[5]->num_value = 0;
 
     char config_path[255];
     sprintf(config_path, "%s/.zxconfig", zs->homedir);
@@ -104,12 +106,13 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
         _s->border = _opts[2]->num_value;
         zs->floating = _opts[3]->num_value;
         _s->font_color = _opts[4]->long_value;
+        zs->daemon = _opts[5]->num_value;
         free(_opts);
         return;
     }
 
-    char *opts[] = {"background", "border_color", "border", "floating", "font_color"};
-    char *opts_type[] = {"ul", "ul", "int", "int", "ul"};
+    char *opts[] = {"background", "border_color", "border", "floating", "font_color", "daemon"};
+    char *opts_type[] = {"ul", "ul", "int", "int", "ul", "int"};
 
     GError *err = NULL;
 
@@ -134,6 +137,8 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
     _s->border = _opts[2]->num_value;
     zs->floating = _opts[3]->num_value;
     _s->font_color = _opts[4]->long_value;
+    zs->daemon = _opts[5]->num_value;
+
 
     if (_s->border == 0) {
         _s->rect_border = _s->background;
@@ -316,9 +321,14 @@ void draw_wins_main(xcb_helper_struct *_s, zx *zs) {
   draw_windows(zs, _s);
 }
 
-void sighandle(int signal) {
-  if (signal == SIGINT || signal == SIGTERM) {
+void sighandle(int signal_) {
+  if (signal_ == SIGINT || signal_ == SIGTERM) {
     events = 0;
+  } else if (signal_ == SIGUSR1) {
+    if (visible)
+      visible = 0;
+    else
+      visible = 1;
   }
 }
 
@@ -327,42 +337,54 @@ void *bg_thread(void *arg) {
   xcb_helper_struct *_s = inf->s;
   zx *zs = inf->internal;
   while (events) {
-    if (redraw) {
-      clear_window(_s, zs);
-      draw_wins_main(_s, zs);
-      FL(_s)
-      redraw = 0;
-    }
-    if ((_s->event = xcb_poll_for_event(_s->c))) {
-      switch (_s->event->response_type & ~0x80) {
-        case XCB_EXPOSE:
-          _s->expose_ev = (xcb_expose_event_t*)_s->event;
-          if (_s->expose_ev->count == 0) {
-            draw_wins_main(_s, zs);
-          }
-          FL(_s);
-          break;
-      case XCB_BUTTON_PRESS:
-        _s->press_ev = (xcb_button_press_event_t*)_s->event;
-        GError *err = NULL;
-        int x = _s->press_ev->event_x;
-        zxwin *win = winatx(x, zs);
-        if (win) {
-          char command[255];
-          sprintf(command, "move window to workspace %d;", zs->active_workspace, zs->active_workspace);
-          i3ipc_con_command(win->con, command, &err);
-          if (err) {
-            zx_log(zs, "ERROR! Error moving window to workspace!\n");
-            events = 0;
-          }
-
-          if (!zs->floating)
-            i3ipc_con_command(win->con, "floating toggle", NULL);
-        }
-        break;
+    if (!visible) {
+      if (_s->mapped) {
+        xcb_h_unmap(_s);
+        FL(_s)
+      }
+    } else {
+      if (!_s->mapped) {
+        xcb_h_map(_s);
+        FL(_s)
       }
 
-      free(_s->event);
+      if (redraw) {
+        clear_window(_s, zs);
+        draw_wins_main(_s, zs);
+        FL(_s)
+        redraw = 0;
+      }
+      if ((_s->event = xcb_poll_for_event(_s->c))) {
+        switch (_s->event->response_type & ~0x80) {
+          case XCB_EXPOSE:
+            _s->expose_ev = (xcb_expose_event_t*)_s->event;
+            if (_s->expose_ev->count == 0) {
+              draw_wins_main(_s, zs);
+            }
+            FL(_s);
+            break;
+        case XCB_BUTTON_PRESS:
+          _s->press_ev = (xcb_button_press_event_t*)_s->event;
+          GError *err = NULL;
+          int x = _s->press_ev->event_x;
+          zxwin *win = winatx(x, zs);
+          if (win) {
+            char command[255];
+            sprintf(command, "move window to workspace %d;", zs->active_workspace, zs->active_workspace);
+            i3ipc_con_command(win->con, command, &err);
+            if (err) {
+              zx_log(zs, "ERROR! Error moving window to workspace!\n");
+              events = 0;
+            }
+
+            if (!zs->floating)
+              i3ipc_con_command(win->con, "floating toggle", NULL);
+          }
+          break;
+        }
+
+        free(_s->event);
+      }
     }
 
     usleep(1000);
@@ -416,9 +438,13 @@ int main(int argc, char **argv) {
     on_exit(xcb_h_destroy, (void*)_s);
     signal(SIGINT, sighandle);
     signal(SIGTERM, sighandle);
+    signal(SIGUSR1, sighandle);
 
     if (!events)
         goto done;
+
+    if (zs->daemon)
+        daemon(0, 0);
 
     GError *err = NULL;
     zs->conn = i3ipc_connection_new(NULL, &err);

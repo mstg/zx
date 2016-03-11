@@ -63,11 +63,14 @@ typedef struct xcb_helper_struct {
   unsigned long rect_border;
   unsigned long font_color;
   int border;
+  int mapped;
 } xcb_helper_struct;
 
 void xcb_h_setup(xcb_helper_struct *internal);
 
 void xcb_h_map(xcb_helper_struct *internal);
+
+void xcb_h_unmap(xcb_helper_struct *internal);
 
 void xcb_h_gc_setup(xcb_helper_struct *internal);
 

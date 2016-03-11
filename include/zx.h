@@ -23,16 +23,6 @@
 #include <xcb/xcb.h>
 #include <i3ipc-glib/i3ipc-glib.h>
 
-typedef union rgba_t {
-    struct {
-        uint8_t b;
-        uint8_t g;
-        uint8_t r;
-        uint8_t a;
-    };
-    uint32_t v;
-} rgba_t;
-
 typedef struct zxwin {
   char *title;
   int title_len;
@@ -51,4 +41,5 @@ typedef struct zx {
   int active_workspace;
   int floating;
   char *homedir;
+  int daemon;
 } zx;

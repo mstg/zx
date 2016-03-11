@@ -43,6 +43,7 @@ border_color=0x7F8C8D
 border=1
 floating=0
 font_color=0xFFFFFF
+daemon=0
 ```
 
 Config explanation
@@ -52,4 +53,7 @@ border_color (unsigned long / hex) - border color (border around each window ent
 border (int) - enable/disable border
 floating (int) - should windows opened from zx float or not
 font_color (unsigned long / hex) - font color (ex. 0xFFFFFF)
+daemon (int) - run in daemon mode or not
 ```
+
+You can also show/hide zx on command by sending it a USR1 signal (ex. `killall -USR1 zx`)
