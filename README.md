@@ -4,7 +4,16 @@ i3 scratchpad manager
 # About zx
 zx creates a taskbar like window on the bottom of the screen to show you windows which have been minimized (sent to scratchpad). You can easily reopen them in any workspace you like.
 
-TODO: Add screenshots
+Default:
+![Default](https://raw.githubusercontent.com/mstg/zx/master/screenshots/default.png)
+
+No-border:
+~/.zxconfig:
+```
+[zx]
+border=0
+```
+![No-border](https://raw.githubusercontent.com/mstg/zx/master/screenshots/no-border.png)
 
 # Status
 This is fully working, very little tested.
