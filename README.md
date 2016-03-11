@@ -1,6 +1,10 @@
 # zx
 i3 scratchpad manager
 
+[ArchLinux thread](https://bbs.archlinux.org/viewtopic.php?pid=1611058)
+
+[AUR package](https://aur.archlinux.org/packages/zx-git/)
+
 # About zx
 zx creates a taskbar like window on the bottom of the screen to show you windows which have been minimized (sent to scratchpad). You can easily reopen them in any workspace you like.
 
