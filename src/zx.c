@@ -334,7 +334,7 @@ void *bg_thread(void *arg) {
       redraw = 0;
     }
     if ((_s->event = xcb_poll_for_event(_s->c))) {
-      switch (_s->event->response_type & 0x7F) {
+      switch (_s->event->response_type & ~0x80) {
         case XCB_EXPOSE:
           _s->expose_ev = (xcb_expose_event_t*)_s->event;
           if (_s->expose_ev->count == 0) {
@@ -361,7 +361,11 @@ void *bg_thread(void *arg) {
         }
         break;
       }
+
+      free(_s->event);
     }
+
+    usleep(1000);
   }
 
   if (main_loop) {
@@ -369,7 +373,7 @@ void *bg_thread(void *arg) {
     g_main_loop_unref(main_loop);
   }
 
-  return NULL;
+  pthread_exit(&bgt);
 }
 
 void workspace_callback(i3ipcConnection *conn, i3ipcWorkspaceEvent *e, zx *zs) {
