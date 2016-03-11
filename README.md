@@ -28,8 +28,12 @@ Install the requirements then run `make` then `sudo make install`
 
 You can run this from your i3 config to run on startup
 
-# Installation (Arch AUR)
-`yaourt -S zx-git`
+~~# Installation (Arch AUR)~~
+
+~~`yaourt -S zx-git`~~
+
+I deleted the AUR package to fix some issues
+
 
 # Config
 You can configure zx with a config file in ~/.zxconfig
