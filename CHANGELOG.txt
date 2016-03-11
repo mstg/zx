@@ -1,0 +1,7 @@
+3e313e97d69c2b7b752751d6790e99295cbcbf62 - Add daemon mode and visibility toggling
+
+1df0424a96279a5f49156ab44624c0af95a543b8 - Fix 100% CPU load
+
+fa04baf5fbb72f5ce774f7a509785ef884f57f0e - Switch to autotools
+
+3f657777ba905dae6188953089bfb070fc217a1e - Add config and workspace detection
