@@ -30,3 +30,29 @@
 
 # Debug files
 *.dSYM/
+
+# Automake
+autom4te.cache/
+aclocal.m4
+*.log
+config.h*
+*.status
+configure
+*.guess
+*.sub
+depcomp
+install-sh
+ltmain.sh
+missing
+compile
+libltdl
+Makefile
+Makefile.in
+stamp-h1
+src/.deps
+src/Makefile
+src/Makefile.in
+
+# Other
+Makefile.bak
+zx
