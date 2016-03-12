@@ -46,13 +46,11 @@ This is fully working, very little tested.
 ```
 autoreconf --install --force
 ./configure --prefix='/usr'
-sudo make install
+make
 ```
 
 # Installation
-Install the requirements then run `make` then `sudo make install`
-
-You can run this from your i3 config to run on startup
+Install the requirements, compile then run `sudo make install`
 
 # Installation (Arch AUR)
 `yaourt -S zx-git`
