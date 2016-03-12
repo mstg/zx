@@ -355,6 +355,8 @@ void *bg_thread(void *arg) {
       }
     } else {
       if (!_s->mapped) {
+        xcb_h_setup(_s);
+        xcb_change(_s, zs);
         xcb_h_map(_s);
         FL(_s)
       }
