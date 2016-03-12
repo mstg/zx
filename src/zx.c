@@ -40,7 +40,7 @@ static GMainLoop *main_loop = NULL;
 static pthread_t bgt;
 static int visible = 1;
 
-#define VERSION "1.0-2"
+#define VERSION "1.1"
 
 void zx_log_init(zx *internal) {
   char *homedir;
