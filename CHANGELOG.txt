@@ -1,3 +1,9 @@
+a46c9cda62a05fc36c03114e904916214c6c53bf - v1.1
+
+3634b26e51702e8a14415d74d13ac72c2e4f2066 - Fix positioning when toggling visibility
+
+3c339c186869b95614236bf8303fe86f0f5eea93 - Add multimonitor support and cli argument support for config
+
 3e313e97d69c2b7b752751d6790e99295cbcbf62 - Add daemon mode and visibility toggling
 
 1df0424a96279a5f49156ab44624c0af95a543b8 - Fix 100% CPU load
