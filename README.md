@@ -42,6 +42,13 @@ This is fully working, very little tested.
 * glib
 * libxcb
 
+# Compiling
+```
+autoreconf --install --force
+./configure --prefix='/usr'
+sudo make install
+```
+
 # Installation
 Install the requirements then run `make` then `sudo make install`
 
