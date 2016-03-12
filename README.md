@@ -65,6 +65,7 @@ font_color=0xFFFFFF
 daemon=0
 font=fixed
 pin_bottom=1
+height=25
 ```
 
 Config explanation
@@ -77,6 +78,7 @@ font_color (unsigned long / hex) - font color (ex. 0xFFFFFF)
 daemon (int) - run in daemon mode or not
 font (char) - font name
 pin_bottom (int) - pin to bottom of screen
+height (int) - height of zx bar
 ```
 
 You can also show/hide zx on command by sending it a USR1 signal (ex. `killall -USR1 zx`)
