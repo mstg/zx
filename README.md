@@ -6,7 +6,7 @@ i3 scratchpad manager
 [AUR package](https://aur.archlinux.org/packages/zx-git/)
 
 ```
-usage: zx [ -h | -x ]
+usage: zx [ -h | -x | -H | -d | -b | -f | -n | -F | -a | -B | -p]
         -h shows help
         -x sets x offset
         -H sets height
