@@ -57,6 +57,7 @@ typedef struct xcb_helper_struct {
   xcb_font_t font;
   int count;
   int x;
+  int y;
   int width;
   int height;
   unsigned long background;
@@ -64,6 +65,9 @@ typedef struct xcb_helper_struct {
   unsigned long font_color;
   int border;
   int mapped;
+  int font_width;
+  int font_height;
+  int font_descent;
 } xcb_helper_struct;
 
 void xcb_h_setup(xcb_helper_struct *internal);

@@ -42,4 +42,6 @@ typedef struct zx {
   int floating;
   char *homedir;
   int daemon;
+  char *font;
+  int pin_bottom;
 } zx;

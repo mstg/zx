@@ -75,7 +75,7 @@ void _xcb_h_setup(xcb_helper_struct *internal) {
 
 void xcb_h_win_setup(xcb_helper_struct *internal) {
     internal->window = xcb_generate_id(internal->c);
-    xcb_create_window(internal->c, XCB_COPY_FROM_PARENT, internal->window, internal->screen->root, internal->x, 0, internal->width, internal->height, 0,
+    xcb_create_window(internal->c, XCB_COPY_FROM_PARENT, internal->window, internal->screen->root, internal->x, internal->y, internal->width, internal->height, 0,
         XCB_WINDOW_CLASS_INPUT_OUTPUT, internal->screen->root_visual, XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK,
         (const uint32_t []){internal->background, XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_BUTTON_PRESS});
 }
@@ -148,6 +148,13 @@ void xcb_h_setup_font(xcb_helper_struct *internal, const char *fontname) {
   internal->font = xcb_generate_id (internal->c);
   xcb_void_cookie_t font_c = xcb_open_font_checked(internal->c, internal->font, strlen(fontname), fontname);
   xcb_h_check_cookie(internal, font_c, "cant open font");
+
+  xcb_query_font_cookie_t queryreq = xcb_query_font(internal->c, internal->font);
+  xcb_query_font_reply_t *font_info = xcb_query_font_reply(internal->c, queryreq, NULL);
+
+  internal->font_width = font_info->max_bounds.character_width;
+  internal->font_height = font_info->font_ascent + font_info->font_descent;
+  internal->font_descent = font_info->font_descent;
 
   internal->gc[GC_FONT] = xcb_generate_id(internal->c);
   xcb_create_gc(internal->c, internal->gc[GC_FONT], internal->window, XCB_GC_FOREGROUND | XCB_GC_BACKGROUND | XCB_GC_FONT, (const uint32_t[]){ internal->font_color,

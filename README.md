@@ -5,6 +5,21 @@ i3 scratchpad manager
 
 [AUR package](https://aur.archlinux.org/packages/zx-git/)
 
+```
+usage: zx [ -h | -x ]
+        -h shows help
+        -x sets x offset
+        -H sets height
+        -d sets daemon mode
+        -b sets background color
+        -f sets font
+        -n sets font color
+        -F sets floating
+        -a sets border color
+        -B sets border
+        -p pin to bottom of screen
+```
+
 # About zx
 zx creates a taskbar like window on the bottom of the screen to show you windows which have been minimized (sent to scratchpad). You can easily reopen them in any workspace you like.
 
@@ -48,6 +63,8 @@ border=1
 floating=0
 font_color=0xFFFFFF
 daemon=0
+font=fixed
+pin_bottom=1
 ```
 
 Config explanation
@@ -58,6 +75,23 @@ border (int) - enable/disable border
 floating (int) - should windows opened from zx float or not
 font_color (unsigned long / hex) - font color (ex. 0xFFFFFF)
 daemon (int) - run in daemon mode or not
+font (char) - font name
+pin_bottom (int) - pin to bottom of screen
 ```
 
 You can also show/hide zx on command by sending it a USR1 signal (ex. `killall -USR1 zx`)
+
+You can also configure zx using cli arguments.
+
+# Multimonitor
+Just spawn another zx instance and pad x or y offset using `-x or -y` parameters
+
+Example:
+
+Two 1920x1080 monitors
+```
+zx
+zx -x 1920
+```
+
+I also recommend setting `focus_follows_mouse` to `yes` in i3 config when using zx with a multimonitor setup

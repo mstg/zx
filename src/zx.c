@@ -40,6 +40,8 @@ static GMainLoop *main_loop = NULL;
 static pthread_t bgt;
 static int visible = 1;
 
+#define VERSION "1.0-2"
+
 void zx_log_init(zx *internal) {
   char *homedir;
   if ((homedir = getenv("HOME")) == NULL) {
@@ -72,16 +74,17 @@ void zx_log(zx *internal, const char *log_) {
 void zx_config(xcb_helper_struct *_s, zx *zs) {
     // Const values (Auto defined)
     _s->x = 0;
+    _s->y = 0;
     _s->width = 0;
-    _s->height = 25;
 
     typedef struct options {
         unsigned long long_value;
         int num_value;
+        char *char_value;
     } options;
 
     options **_opts = malloc(sizeof(options)+sizeof(int)*4+sizeof(unsigned long)*3+1);
-    int count_def = 6;
+    int count_def = 9;
 
     for (int i = 0; i < count_def; i++) {
         _opts[i] = malloc(sizeof(int)+sizeof(unsigned long));
@@ -93,6 +96,9 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
     _opts[3]->num_value = 0;
     _opts[4]->long_value = 0xFFFFFF;
     _opts[5]->num_value = 0;
+    _opts[6]->num_value = 25;
+    _opts[7]->char_value = "fixed";
+    _opts[8]->num_value = 1;
 
     char config_path[255];
     sprintf(config_path, "%s/.zxconfig", zs->homedir);
@@ -101,18 +107,12 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
 
     if (!g_key_file_load_from_file(gkf, config_path, G_KEY_FILE_NONE, NULL)){
         fprintf (stderr, "WARNING! Could not read config file %s! No config file present\n", config_path);
-        _s->background = _opts[0]->long_value;
-        _s->rect_border = _opts[1]->long_value;
-        _s->border = _opts[2]->num_value;
-        zs->floating = _opts[3]->num_value;
-        _s->font_color = _opts[4]->long_value;
-        zs->daemon = _opts[5]->num_value;
-        free(_opts);
+        goto set_opts;
         return;
     }
 
-    char *opts[] = {"background", "border_color", "border", "floating", "font_color", "daemon"};
-    char *opts_type[] = {"ul", "ul", "int", "int", "ul", "int"};
+    char *opts[] = {"background", "border_color", "border", "floating", "font_color", "daemon", "height", "font", "pin_bottom"};
+    char *opts_type[] = {"ul", "ul", "int", "int", "ul", "int", "int", "char", "int"};
 
     GError *err = NULL;
 
@@ -128,31 +128,42 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
                 unsigned long t = strtoul(temp, NULL, 0);
                 _opts[i]->long_value = t;
             }
+        } else if (strcmp(opts_type[i], "char") == 0) {
+          char *temp = g_key_file_get_value(gkf, "zx", opts[i], &err);
+          if (!err) {
+              _opts[i]->char_value = temp;
+          }
         }
         err = NULL;
     }
 
-    _s->background = _opts[0]->long_value;
-    _s->rect_border = _opts[1]->long_value;
-    _s->border = _opts[2]->num_value;
-    zs->floating = _opts[3]->num_value;
-    _s->font_color = _opts[4]->long_value;
-    zs->daemon = _opts[5]->num_value;
-
-
-    if (_s->border == 0) {
-        _s->rect_border = _s->background;
-    }
-
     g_key_file_free(gkf);
-    free(_opts);
+
+set_opts:
+  _s->background = _opts[0]->long_value;
+  _s->rect_border = _opts[1]->long_value;
+  _s->border = _opts[2]->num_value;
+  zs->floating = _opts[3]->num_value;
+  _s->font_color = _opts[4]->long_value;
+  zs->daemon = _opts[5]->num_value;
+  _s->height = _opts[6]->num_value;
+  zs->font = _opts[7]->char_value;
+  zs->pin_bottom = _opts[8]->num_value;
+  free(_opts);
 }
 
-void xcb_change(xcb_helper_struct *_s) {
+void xcb_change(xcb_helper_struct *_s, zx *zs) {
     int strut[12] = {0};
-    strut[3]  = _s->height;
-    strut[10] = _s->x;
-    strut[11] = _s->x + _s->width;
+
+    if (zs->pin_bottom) {
+      strut[3]  = _s->height;
+      strut[10] = _s->x;
+      strut[11] = _s->x + _s->width;
+    } else {
+      strut[2] = _s->height;
+      strut[8] = _s->x;
+      strut[9] = _s->x + _s->width;
+    }
 
     xcb_h_change_property(_s, XCB_PROP_MODE_REPLACE, NET_WM_WINDOW_TYPE, XCB_ATOM_ATOM, 32, 1, NET_WM_WINDOW_TYPE_DOCK);
     xcb_h_change_property(_s, XCB_PROP_MODE_APPEND, NET_WM_STATE, XCB_ATOM_ATOM, 32, 2, NET_WM_STATE_STICKY);
@@ -237,7 +248,7 @@ void scan_width(zx *_s, xcb_helper_struct *zs) {
 void draw_windows(zx *_s, xcb_helper_struct *zs) {
   for (int i = 0; i < _s->windows; i++) {
     xcb_h_draw_rect(zs, GC1, 1, _s->windef[i]->win_rect);
-    xcb_h_draw_text(zs, GC_FONT, _s->windef[i]->x+_s->windef[i]->width/2-(_s->windef[i]->title_len*2), zs->height-10, _s->windef[i]->title);
+    xcb_h_draw_text(zs, GC_FONT, _s->windef[i]->x+_s->windef[i]->width/2-(_s->windef[i]->title_len*2), zs->height/2+zs->font_height/2-zs->font_descent, _s->windef[i]->title);
   }
 }
 
@@ -435,6 +446,63 @@ int main(int argc, char **argv) {
 
     zx_config(_s, zs);
 
+    int ch;
+    while ((ch = getopt(argc, argv, "hx:y:H:d:b:f:n:F:a:B:p:")) != -1) {
+      switch(ch) {
+        case 'h':
+          printf("zx version: %s\n", VERSION);
+          printf("usage: %s [ -h | -x ]\n"
+            "\t-h shows help\n"
+            "\t-x sets x offset\n"
+            "\t-H sets height\n"
+            "\t-d sets daemon mode\n"
+            "\t-b sets background color\n"
+            "\t-f sets font\n"
+            "\t-n sets font color\n"
+            "\t-F sets floating\n"
+            "\t-a sets border color\n"
+            "\t-B sets border\n"
+            "\t-p pin to bottom of screen\n"
+            , argv[0]);
+          goto done;
+          break;
+        case 'x':
+          _s->x = strtol(optarg, NULL, 10);
+          break;
+        case 'y':
+          _s->y = strtol(optarg, NULL, 10);
+          break;
+        case 'H':
+          _s->height = strtol(optarg, NULL, 10);
+          break;
+        case 'd':
+          zs->daemon = strtol(optarg, NULL, 10);
+          break;
+        case 'f':
+          zs->font = optarg;
+          break;
+        case 'n':
+          _s->font_color = strtoul(optarg, NULL, 0);
+          break;
+        case 'F':
+          zs->floating = strtol(optarg, NULL, 10);
+          break;
+        case 'a':
+          _s->rect_border = strtoul(optarg, NULL, 0);
+          break;
+        case 'B':
+          _s->border = strtol(optarg, NULL, 10);
+          break;
+        case 'p':
+          zs->pin_bottom = strtol(optarg, NULL, 10);
+          break;
+        }
+    }
+
+    if (_s->border == 0) {
+        _s->rect_border = _s->background;
+    }
+
     on_exit(xcb_h_destroy, (void*)_s);
     signal(SIGINT, sighandle);
     signal(SIGTERM, sighandle);
@@ -462,7 +530,6 @@ int main(int argc, char **argv) {
 
     for (GSList *el = outputs; el; el = el->next) {
       i3ipcOutputReply *output = (i3ipcOutputReply*)el->data;
-      // TODO: Add multi monitor support
       if (!_s->width) {
         _s->width = output->rect->width;
       }
@@ -471,11 +538,11 @@ int main(int argc, char **argv) {
 
     xcb_h_setup(_s);
 
-    xcb_change(_s);
+    xcb_change(_s, zs);
 
     xcb_h_map(_s);
 
-    xcb_h_setup_font(_s, "fixed");
+    xcb_h_setup_font(_s, zs->font);
 
     FL(_s);
 
