@@ -1,3 +1,5 @@
+4a74cfac913986dfc3198f85e458b40070665f7f - Add support for pango fonts
+
 a46c9cda62a05fc36c03114e904916214c6c53bf - v1.1
 
 3634b26e51702e8a14415d74d13ac72c2e4f2066 - Fix positioning when toggling visibility
