@@ -6,7 +6,7 @@ i3 scratchpad manager
 [AUR package](https://aur.archlinux.org/packages/zx-git/)
 
 ```
-usage: zx [ -h | -x | -H | -d | -b | -f | -n | -F | -a | -B | -p]
+usage: zx [ -h | -x | -H | -d | -b | -f | -n | -F | -a | -B | -p | -t]
         -h shows help
         -x sets x offset
         -H sets height
@@ -18,6 +18,7 @@ usage: zx [ -h | -x | -H | -d | -b | -f | -n | -F | -a | -B | -p]
         -a sets border color
         -B sets border
         -p pin to bottom of screen
+        -t font type (pango | xcb)
 ```
 
 # About zx
@@ -68,9 +69,10 @@ border=1
 floating=0
 font_color=0xFFFFFF
 daemon=0
-font=fixed
 pin_bottom=1
 height=25
+font_type=pango
+font=DejaVu Sans Mono 4
 ```
 
 Config explanation
@@ -84,6 +86,7 @@ daemon (int) - run in daemon mode or not
 font (char) - font name
 pin_bottom (int) - pin to bottom of screen
 height (int) - height of zx bar
+font_type (char) - font type; either pango (for antialiased fonts) or xcb (old xfontsel fonts)
 ```
 
 You can also show/hide zx on command by sending it a USR1 signal (ex. `killall -USR1 zx`)

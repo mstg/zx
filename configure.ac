@@ -12,6 +12,9 @@ AC_PROG_CC
 # Checks for libraries.
 PKG_CHECK_MODULES([xcb], [xcb])
 PKG_CHECK_MODULES([i3ipc], [i3ipc-glib-1.0])
+PKG_CHECK_MODULES([pango], [pango])
+PKG_CHECK_MODULES([pangocairo], [pangocairo])
+PKG_CHECK_MODULES([cairo], [cairo])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h string.h unistd.h glib.h])

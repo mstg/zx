@@ -22,6 +22,8 @@ THE SOFTWARE.
 This file is going to make it easier for you to work with xcb. Feel free to copy
 */
 #include <xcb/xcb.h>
+#include <cairo/cairo-xcb.h>
+#include <pango/pangocairo.h>
 
 enum {
     NET_WM_WINDOW_TYPE,
@@ -44,6 +46,21 @@ enum {
 enum {
   XCB_H_NO_FONT
 };
+
+#define PANGO 0
+#define xcb 1
+
+typedef struct pango_font {
+  PangoFontDescription *pango_desc;
+  xcb_visualtype_t *root_visual_type;
+  double pango_font_red;
+  double pango_font_green;
+  double pango_font_blue;
+
+  double pango_bgfont_red;
+  double pango_bgfont_green;
+  double pango_bgfont_blue;
+} pango_font;
 
 typedef struct xcb_helper_struct {
   xcb_connection_t *c;
@@ -68,6 +85,9 @@ typedef struct xcb_helper_struct {
   int font_width;
   int font_height;
   int font_descent;
+  int font_type;
+  pango_font *pfont;
+  xcb_visualtype_t *root_visual_type;
 } xcb_helper_struct;
 
 void xcb_h_setup(xcb_helper_struct *internal);
@@ -96,7 +116,7 @@ void xcb_h_draw_fill_rect(xcb_helper_struct *internal, int gcnum, int num, xcb_r
 
 void xcb_h_setup_font(xcb_helper_struct *internal, const char *fontname);
 
-int xcb_h_draw_text(xcb_helper_struct *internal, int gcnum, int x, int y, const char *text);
+int xcb_h_draw_text(xcb_helper_struct *internal, int gcnum, int x, int y, const char *text, int max_width);
 
 void xcb_h_destroy(int exit_status, void *internal);
 

@@ -82,8 +82,8 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
         char *char_value;
     } options;
 
-    options **_opts = malloc(sizeof(options)+sizeof(int)*4+sizeof(unsigned long)*3+1);
-    int count_def = 9;
+    options **_opts = malloc(sizeof(options)+sizeof(int)*5+sizeof(unsigned long)*3+1+sizeof(char*)*2);
+    int count_def = 10;
 
     for (int i = 0; i < count_def; i++) {
         _opts[i] = malloc(sizeof(int)+sizeof(unsigned long));
@@ -98,6 +98,7 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
     _opts[6]->num_value = 25;
     _opts[7]->char_value = "fixed";
     _opts[8]->num_value = 1;
+    _opts[9]->char_value = "xcb";
 
     char config_path[255];
     sprintf(config_path, "%s/.zxconfig", zs->homedir);
@@ -110,8 +111,8 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
         return;
     }
 
-    char *opts[] = {"background", "border_color", "border", "floating", "font_color", "daemon", "height", "font", "pin_bottom"};
-    char *opts_type[] = {"ul", "ul", "int", "int", "ul", "int", "int", "char", "int"};
+    char *opts[] = {"background", "border_color", "border", "floating", "font_color", "daemon", "height", "font", "pin_bottom", "font_type"};
+    char *opts_type[] = {"ul", "ul", "int", "int", "ul", "int", "int", "char", "int", "char"};
 
     GError *err = NULL;
 
@@ -148,6 +149,7 @@ set_opts:
   _s->height = _opts[6]->num_value;
   zs->font = _opts[7]->char_value;
   zs->pin_bottom = _opts[8]->num_value;
+  _s->font_type = strcmp(_opts[9]->char_value, "pango") ? xcb : PANGO;
   free(_opts);
 }
 
@@ -206,13 +208,37 @@ zxwin *winatx(int x, zx *internal) {
   return ret;
 }
 
+void str_strip(char *str) {
+  unsigned long i = 0;
+  unsigned long j = 0;
+  char c;
+
+  while ((c = str[i++]) != '\0') {
+    if ((c>=0 && c <128)) {
+      str[j++] = c;
+    }
+  }
+  str[j] = '\0';
+}
+
 void add_win(zx *_s, xcb_helper_struct *zs, const char *label, int id, i3ipcCon *con) {
-  add_windef(_s, _s->windows, label, id, con);
+  char *tlabel;
+
+  gsize l;
+  GError *err = NULL;
+  tlabel = g_locale_to_utf8(label, -1, NULL, &l, &err);
+
+  if (err) {
+    str_strip((char*)label);
+    tlabel = (char*)label;
+  }
+
+  add_windef(_s, _s->windows, tlabel, id, con);
 
   _s->windef[_s->windows-1]->width = 0;
   _s->windef[_s->windows-1]->x = 0;
-  _s->windef[_s->windows-1]->title = (char*)label;
-  _s->windef[_s->windows-1]->title_len = strlen(label);
+  _s->windef[_s->windows-1]->title = tlabel;
+  _s->windef[_s->windows-1]->title_len = strlen(tlabel);
   _s->windef[_s->windows-1]->id = id;
   _s->windef[_s->windows-1]->con = con;
 
@@ -247,7 +273,7 @@ void scan_width(zx *_s, xcb_helper_struct *zs) {
 void draw_windows(zx *_s, xcb_helper_struct *zs) {
   for (int i = 0; i < _s->windows; i++) {
     xcb_h_draw_rect(zs, GC1, 1, _s->windef[i]->win_rect);
-    xcb_h_draw_text(zs, GC_FONT, _s->windef[i]->x+_s->windef[i]->width/2-(_s->windef[i]->title_len*2), zs->height/2+zs->font_height/2-zs->font_descent, _s->windef[i]->title);
+    xcb_h_draw_text(zs, GC_FONT, _s->windef[i]->x, zs->height/2+zs->font_height/2-zs->font_descent, _s->windef[i]->title, _s->windef[i]->width);
   }
 }
 
@@ -437,7 +463,7 @@ void workspace_callback(i3ipcConnection *conn, i3ipcWorkspaceEvent *e, zx *zs) {
 }
 
 int main(int argc, char **argv) {
-    struct xcb_helper_struct *_s = malloc(sizeof(xcb_helper_struct) + 1);
+    struct xcb_helper_struct *_s = malloc(sizeof(xcb_helper_struct) + 1 + sizeof(pango_font) + 1);
     struct zx *zs = malloc(sizeof(zx) + 1 + sizeof(zxwin) + 1);
     zs->windows = 0;
     zs->active_workspace = 1;
@@ -448,11 +474,11 @@ int main(int argc, char **argv) {
     zx_config(_s, zs);
 
     int ch;
-    while ((ch = getopt(argc, argv, "hx:y:H:d:b:f:n:F:a:B:p:")) != -1) {
+    while ((ch = getopt(argc, argv, "hx:y:H:d:b:f:n:F:a:B:p:t:")) != -1) {
       switch(ch) {
         case 'h':
           printf("zx version: %s\n", VERSION);
-          printf("usage: %s [ -h | -x | -H | -d | -b | -f | -n | -F | -a | -B | -p]\n"
+          printf("usage: %s [ -h | -x | -H | -d | -b | -f | -n | -F | -a | -B | -p | -t]\n"
             "\t-h shows help\n"
             "\t-x sets x offset\n"
             "\t-H sets height\n"
@@ -464,6 +490,7 @@ int main(int argc, char **argv) {
             "\t-a sets border color\n"
             "\t-B sets border\n"
             "\t-p pin to bottom of screen\n"
+            "\t-t font type (pango | xcb)\n"
             , argv[0]);
           goto done;
           break;
@@ -496,6 +523,9 @@ int main(int argc, char **argv) {
           break;
         case 'p':
           zs->pin_bottom = strtol(optarg, NULL, 10);
+          break;
+        case 't':
+          _s->font_type = strcmp(optarg, "pango") ? xcb : PANGO;
           break;
         }
     }
@@ -542,6 +572,17 @@ int main(int argc, char **argv) {
     xcb_change(_s, zs);
 
     xcb_h_map(_s);
+
+    if (_s->font_type == PANGO) {
+      _s->pfont = malloc(sizeof(pango_font) + 1);
+      _s->pfont->pango_font_red = ((_s->font_color >> 16) & 0xff) / 255.0;
+      _s->pfont->pango_font_green = ((_s->font_color >> 8) & 0xff) / 255.0;
+      _s->pfont->pango_font_blue = (_s->font_color & 0xff) / 255.0;
+
+      _s->pfont->pango_bgfont_red = ((_s->background >> 16) & 0xff) / 255.0;
+      _s->pfont->pango_bgfont_green = ((_s->background >> 8) & 0xff) / 255.0;
+      _s->pfont->pango_bgfont_blue = (_s->background & 0xff) / 255.0;
+    }
 
     xcb_h_setup_font(_s, zs->font);
 
