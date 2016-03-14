@@ -35,7 +35,6 @@
 
 static int events = 1;
 static int redraw = 0;
-static int signal_att = 0;
 static GMainLoop *main_loop = NULL;
 static pthread_t bgt;
 static int visible = 1;
