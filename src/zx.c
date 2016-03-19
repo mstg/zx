@@ -381,7 +381,7 @@ void sighandle(int signal_) {
 }
 
 int should_float(const char *name, zx *zs) {
-  for (int i = 0; i < zs->floating_windows_length-1; i++) {
+  for (int i = 0; i < zs->floating_windows_length; i++) {
     if (strstr(zs->floating_windows[i], name) != NULL) {
       return 0;
     }
