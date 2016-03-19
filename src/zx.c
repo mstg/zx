@@ -82,7 +82,7 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
         char *char_value;
     } options;
 
-    options **_opts = malloc(sizeof(options)+sizeof(int)*5+sizeof(unsigned long)*3+1+sizeof(char*)*2+sizeof(char**)*2+1);
+    options **_opts = malloc(sizeof(options)+sizeof(int)*5+sizeof(unsigned long)*3+1+sizeof(char*)*2+1);
     int count_def = 10;
 
     for (int i = 0; i < count_def; i++) {
