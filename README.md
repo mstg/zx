@@ -42,6 +42,8 @@ This is fully working, very little tested.
 * i3ipc-glib
 * glib
 * libxcb
+* pango
+* cairo
 
 # Compiling
 ```
