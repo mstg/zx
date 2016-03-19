@@ -82,7 +82,7 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
         char *char_value;
     } options;
 
-    options **_opts = malloc(sizeof(options)+sizeof(int)*5+sizeof(unsigned long)*3+1+sizeof(char*)*2);
+    options **_opts = malloc(sizeof(options)+sizeof(int)*5+sizeof(unsigned long)*3+1+sizeof(char*)*2+sizeof(char**)*2+1);
     int count_def = 10;
 
     for (int i = 0; i < count_def; i++) {
@@ -100,6 +100,9 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
     _opts[8]->num_value = 1;
     _opts[9]->char_value = "xcb";
 
+    unsigned long floating_windows_count = 0;
+    char **flwin_list = NULL;
+
     char config_path[255];
     sprintf(config_path, "%s/.zxconfig", zs->homedir);
 
@@ -111,12 +114,12 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
         return;
     }
 
-    char *opts[] = {"background", "border_color", "border", "floating", "font_color", "daemon", "height", "font", "pin_bottom", "font_type"};
-    char *opts_type[] = {"ul", "ul", "int", "int", "ul", "int", "int", "char", "int", "char"};
+    char *opts[] = {"background", "border_color", "border", "floating", "font_color", "daemon", "height", "font", "pin_bottom", "font_type", "floating_windows"};
+    char *opts_type[] = {"ul", "ul", "int", "int", "ul", "int", "int", "char", "int", "char", "list"};
 
     GError *err = NULL;
 
-    for (int i = 0; i < count_def; i++) {
+    for (int i = 0; i < count_def+1; i++) {
         if (strcmp(opts_type[i], "int") == 0) {
             int t = g_key_file_get_integer (gkf, "zx", opts[i], &err);
             if (!err) {
@@ -132,6 +135,13 @@ void zx_config(xcb_helper_struct *_s, zx *zs) {
           char *temp = g_key_file_get_value(gkf, "zx", opts[i], &err);
           if (!err) {
               _opts[i]->char_value = temp;
+          }
+        } else if (strcmp(opts_type[i], "list") == 0) {
+          gsize length;
+          char **temp = g_key_file_get_string_list(gkf, "zx", opts[i], &length, &err);
+          if (!err) {
+            flwin_list = temp;
+            floating_windows_count = length;
           }
         }
         err = NULL;
@@ -150,6 +160,8 @@ set_opts:
   zs->font = _opts[7]->char_value;
   zs->pin_bottom = _opts[8]->num_value;
   _s->font_type = strcmp(_opts[9]->char_value, "pango") ? xcb : PANGO;
+  zs->floating_windows = flwin_list;
+  zs->floating_windows_length = floating_windows_count;
   free(_opts);
 }
 
@@ -368,6 +380,16 @@ void sighandle(int signal_) {
   }
 }
 
+int should_float(const char *name, zx *zs) {
+  for (int i = 0; i < zs->floating_windows_length-1; i++) {
+    if (strstr(zs->floating_windows[i], name) != NULL) {
+      return 0;
+    }
+  }
+
+  return -1;
+}
+
 void *bg_thread(void *arg) {
   const zxinfo *inf = (zxinfo*)arg;
   xcb_helper_struct *_s = inf->s;
@@ -415,7 +437,8 @@ void *bg_thread(void *arg) {
               events = 0;
             }
 
-            if (!zs->floating)
+            const char *name = i3ipc_con_get_name(win->con);
+            if (!zs->floating && should_float(name, zs) == -1)
               i3ipc_con_command(win->con, "floating toggle", NULL);
           }
           break;

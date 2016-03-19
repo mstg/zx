@@ -73,6 +73,7 @@ pin_bottom=1
 height=25
 font_type=pango
 font=DejaVu Sans Mono 4
+floating_windows=Authy;Spotify
 ```
 
 Config explanation
@@ -87,6 +88,7 @@ font (char) - font name
 pin_bottom (int) - pin to bottom of screen
 height (int) - height of zx bar
 font_type (char) - font type; either pango (for antialiased fonts) or xcb (old xfontsel fonts)
+floating_windows (char list. format: text;text2) - windows to float regardless of floating setting.
 ```
 
 You can also show/hide zx on command by sending it a USR1 signal (ex. `killall -USR1 zx`)

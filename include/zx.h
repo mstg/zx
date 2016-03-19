@@ -44,4 +44,6 @@ typedef struct zx {
   int daemon;
   char *font;
   int pin_bottom;
+  char **floating_windows;
+  unsigned long floating_windows_length;
 } zx;
