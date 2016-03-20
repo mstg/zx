@@ -501,9 +501,10 @@ int main(int argc, char **argv) {
       switch(ch) {
         case 'h':
           printf("zx version: %s\n", VERSION);
-          printf("usage: %s [ -h | -x | -H | -d | -b | -f | -n | -F | -a | -B | -p | -t]\n"
+          printf("usage: %s [ -h | -x | -y | -H | -d | -b | -f | -n | -F | -a | -B | -p | -t]\n"
             "\t-h shows help\n"
             "\t-x sets x offset\n"
+            "\t-y sets y offset\n"
             "\t-H sets height\n"
             "\t-d sets daemon mode\n"
             "\t-b sets background color\n"
