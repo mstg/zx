@@ -308,8 +308,7 @@ typedef struct zxinfo {
 } zxinfo;
 
 void add_win_list(i3ipcCon *win, zxinfo *info) {
-  gchar *win_name;
-  g_object_get(win, "name", &win_name, NULL);
+  const gchar *win_name = i3ipc_con_get_name(win);
 
   gint id;
   g_object_get(win, "id", &id, NULL);
